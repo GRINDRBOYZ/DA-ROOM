@@ -55,8 +55,14 @@ export function createServer(options: { serveClient?: boolean } = {}): DaRoomSer
 
   const shouldServeClient = options.serveClient ?? process.env.NODE_ENV !== 'test';
   if (shouldServeClient) {
-    const distPath = path.resolve(__dirname, '../../dist');
-    if (existsSync(path.join(distPath, 'index.html'))) {
+    // The server can be started from the repo root (`npm start`) or from a
+    // platform-specific working directory, so try both the process cwd and the
+    // compiled/executed file location before giving up on static hosting.
+    const distPath = [
+      path.resolve(process.cwd(), 'dist'),
+      path.resolve(__dirname, '../../dist'),
+    ].find((candidate) => existsSync(path.join(candidate, 'index.html')));
+    if (distPath) {
       app.use(express.static(distPath, { index: false, maxAge: '1h' }));
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) {

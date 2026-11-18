@@ -46,6 +46,29 @@ For local multiplayer smoke tests without extra browser tabs, `scripts/bots.mjs`
 node scripts/bots.mjs http://localhost:3001 ROOMCODE BotOne,BotTwo
 ```
 
+## Deploying
+
+DA ROOM is one Node process: it serves the built client from `dist/`, hosts Socket.IO, and keeps rooms and uploaded images in memory. GitHub Pages **cannot** host it — Pages only serves static files, so there is no socket server, no room state, and no `/api/images/:id`.
+
+`render.yaml` is a [Render Blueprint](https://render.com/docs/blueprint-spec) that deploys the whole app as a single web service:
+
+1. Push to GitHub (branch `main`).
+2. In Render, choose **New → Blueprint** and select this repository.
+3. Render reads `render.yaml` and runs:
+   - build: `npm ci --include=dev && npm run build`
+   - start: `npm start`
+   - health check: `/api/health`
+4. Open the generated `https://<service>.onrender.com` URL. That link is shareable; players just join with the room code.
+
+`tsx` is a runtime dependency rather than a dev dependency, so `npm start` works even when a host installs production dependencies only. `render.yaml` pins Node 22 and `NODE_ENV=production`; change `region` if Frankfurt is not closest to your players.
+
+### Free-tier caveats
+
+- The free instance sleeps after about 15 minutes of inactivity, so the next visitor waits roughly 30–60 seconds for a cold start.
+- Restarting or redeploying wipes every room and image, because storage is in memory by design.
+- Run exactly one instance. Room state is per-process, so horizontal scaling or multiple instances would split players across separate servers.
+- Any host with WebSocket support works (Railway, Fly.io, a VPS, or a container). HTTPS is required for clipboard and camera-free paste flows to behave like they do on localhost; Render supplies TLS and `wss://` automatically.
+
 ## How to play
 
 1. One player creates a room with a nickname. The room gets a five-character code and a shareable link.
@@ -150,6 +173,7 @@ tests/
   settings.test.ts          settings normalization, caption and text rendering
 scripts/
   bots.mjs                  optional local helper: N socket bots join, submit, and vote
+render.yaml                 Render Blueprint: one Node service for client + server
 ```
 
 ### Phases
